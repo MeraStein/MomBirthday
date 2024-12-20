@@ -1,94 +1,44 @@
-// if(document.referrer.includes("blessIndex.html")) {
-//     const guest = findByName('guest_name');
-//     guest.isComing = localStorage.getItem(guest.name + '_isComing') === 'true';
-//     guest.blessing = localStorage.getItem(guest.name + '_blessing');
-//     createAcountState(guest);
-// } 
+import { db, collection, findDocById, updateFieldInDocument, getDocs } from './firebase.js';
 
-class Guest {
-    constructor(name, verify, answer, options, pictureSrc = []) {
-        this.name = name;
-        this.verify = verify;
-        this.answer = answer;
-        this.options = options;
-        this.pictureSrc = pictureSrc || 'resources/images/default-pic.jpg';
-        this.isComing = false;
-        this.blessing = "";
-    }
-
-     setPicture(src) {
-         this.pictureSrc = src;
+let guestsDocs = [];
+async function loadGuests() {
+    try {
+        const guestsRef = collection(db, "guests");
+        const snapshot = await getDocs(guestsRef);
+        guestsDocs = snapshot.docs; 
+    } catch (error) {
+        console.error("שגיאה בטעינת האורחים:", error);
     }
 }
-
-const guestList = [];
-
-function fillGuestList() {
-    let name, question, answer, opts = [], picSrc;
-
-    fetch('resources/data/guests-data.txt')
-        .then(response => {
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-            return response.text();
-        })
-        .then(text => {
-            const lines = text.split('\n');
-            lines.forEach((line, index) => {
-                line = line.trim(); 
-                if(line === '') return; 
-
-                switch (index%7) {
-                    case 0:
-                        name = line;
-                        break;
-                    case 1:
-                        question = line;
-                        break;
-                    case 2:
-                        answer = line;
-                        break;
-                    case 3:
-                    case 4:
-                    case 5:
-                        opts.push(line);
-                        break;
-                    case 6:
-                        picSrc = line.replace(/['"]/g, '');
-                        guestList.push(new Guest(name, question, answer, opts, picSrc));
-                        opts = []; 
-                        break;
-                }
-            });
-            guestList.sort((a, b) => a.name.localeCompare(b.name)); 
-        })
-        .catch(error => console.error('שגיאה בקריאת הקובץ:', error));
-}
-window.guestList = guestList;
+await loadGuests(); 
 
 const ul = document.getElementById("guestList");
 
-function drawList(list) {
+
+//draw list
+async function drawList(names) {
     ul.innerHTML = '';
-    list.forEach(guest => {
+
+    names.forEach(name => {
         const li = document.createElement('li');
-        li.textContent = guest.name;
+        li.textContent = name;
         li.addEventListener('click', function() {
-            createVerifyState(guest.name);
+            createVerifyState(name);
         });
+
         ul.appendChild(li);
     });
 }
-
-fillGuestList();
 drawList([]);
 
 const searchInput = document.getElementById('searchInput');
 searchInput.addEventListener('input', function() {
-    const filteredGuests = search(guestList, searchInput.value, "include");
+    const filteredGuests = filterGuestsByInclude(searchInput.value);  
     drawList(filteredGuests);
     if(searchInput.value.length === 0)
         drawList([]);
 });
+
 
 const mainDiv = document.getElementById('main-div');
 
@@ -98,11 +48,11 @@ function clear() {
 }
 
 //create and manage verify situation
-function createVerifyState(name) {
+async function createVerifyState(name) {
 
     clear();
 
-    const guest = findByName(name);
+    const guest = await findDocById("guests", name);
 
     if(!guest)
     {
@@ -114,7 +64,7 @@ function createVerifyState(name) {
 
     //the question
     const hVerify = document.createElement('h2');
-    hVerify.textContent = guest.verify;
+    hVerify.textContent = guest.question;
     hVerify.style.marginTop = "45%";
     mainDiv.appendChild(hVerify);
 
@@ -147,8 +97,6 @@ function createVerifyState(name) {
         });
     }    
 }
-
-
 
 /*
  * create acount situation.
@@ -188,8 +136,7 @@ function createAcountState(guest) {
 
     
     const btn = document.createElement('button');
-    const savesIsComing = localStorage.getItem(guest.name + '_isComing', guest.isComing) === 'true';
-    btn.textContent = savesIsComing ? "מגיע.ה" : "לאישור";
+    btn.textContent = guest.isComing ? "מגיע.ה" : "לאישור";
     btn.style.width = '10vh';
     btn.style.height = '4vh';
     btn.style.fontSize = '2vh';
@@ -197,7 +144,7 @@ function createAcountState(guest) {
     btn.style.marginTop = '13%';
     btn.addEventListener('click', function() {
         guest.isComing = !guest.isComing;
-        localStorage.setItem(guest.name + '_isComing', guest.isComing);
+        updateFieldInDocument("guests", guest.name, 'isComing', guest.isComing);
         btn.textContent = guest.isComing ? "מגיע.ה" : "לאישור";
     });
     div.appendChild(btn);
@@ -207,9 +154,11 @@ function createAcountState(guest) {
     blessInput.placeholder = 'נסח פה...';
     blessInput.innerText = guest.blessing;
     blessInput.addEventListener('blur', function() {
-        guest.blessing = blessInput.value;  
-        localStorage.setItem(guest.name + '_blessing', blessInput.value);
+        const newBlessing = blessInput.value;
+        updateFieldInDocument("guests", guest.name, 'blessing', newBlessing);
+        guest.blessing = newBlessing; 
     });
+    
     mainDiv.appendChild(blessInput);
 
     const btn1 = document.createElement('button');
@@ -225,51 +174,17 @@ function createAcountState(guest) {
     mainDiv.appendChild(btn1);
 }
 
+//help function
+function filterGuestsByInclude(str) {
+    const filteredGuests = [];
 
+    guestsDocs.forEach(guestDoc => {
+        const guestData = guestDoc.data(); 
+        if (guestData.name.includes(str)) 
+            filteredGuests.push(guestData.name);
+    });
 
-
-//help functions
-
-function findByName(name) {
-    let index = search(guestList, name, "is");
-    if(index >= 0)
-        return guestList[index];
-    else
-        return false;
+    return filteredGuests;
 }
 
-function search(arr, target, type) {
-
-    let low = 0;
-    let high = arr.length-1;
-    
-    if(type.localeCompare("include") == 0) {
-        const filteredGuests = [];
-        arr.forEach(guest => {
-            if(guest.name.includes(target))
-                filteredGuests.push(guest);
-        });
-
-        return filteredGuests;
-    }
-
-    if(type.localeCompare("is") == 0) {
-        while (low <= high) {
-            const mid = Math.floor((low+high)/2);
-            const midValue = arr[mid].name;
-    
-            if(midValue.localeCompare(target) == 0) {
-                return mid;  
-            }
-            if(midValue.localeCompare(target) > 0) {
-                high = mid-1;
-            } 
-            else {
-                low = mid+1;
-            }
-        }
-        return -1;
-    }
-    
-}
 

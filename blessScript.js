@@ -1,17 +1,30 @@
+import { db, collection, getDocs } from './firebase.js';
 
-const guestList = window.guestList;
+let guestsDocs = [];
+async function loadGuests() {
+    try {
+        const guestsRef = collection(db, "guests");
+        const snapshot = await getDocs(guestsRef);
+        guestsDocs = snapshot.docs; 
+    } catch (error) {
+        console.error("שגיאה בטעינת האורחים:", error);
+    }
+}
+await loadGuests(); 
+
 const ul = document.getElementById('blessList');
 ul.className = 'scroll-container';
 ul.style.marginTop = '57%';
 
-function drawList(list) {
+
+function drawList(guests) {
+
     ul.innerHTML = '';
-    list.forEach(guest => {
+    guests.forEach(guestDoc => {
 
-        const savedBlessing = localStorage.getItem(guest.name + '_blessing') || "";
-        const savedIsComing = localStorage.getItem(guest.name + '_isComing') === 'true';
+        const guest = guestDoc.data();
 
-        if(savedBlessing.length === 0)
+        if(!guest.blessing || guest.blessing.trim().length === 0)
              return;
 
         const div = document.createElement('div');
@@ -29,7 +42,7 @@ function drawList(list) {
 
         //is coming
         const hIsComing = document.createElement('h3');
-        hIsComing.textContent = savedIsComing ? 'אהיה ביומולדת' : '';
+        hIsComing.textContent = guest.isComing ? 'אהיה ביומולדת' : '';
         hIsComing.style.marginTop = '-1%';
         hIsComing.style.marginLeft = '65%';
         div.appendChild(hIsComing);
@@ -37,7 +50,7 @@ function drawList(list) {
         //blessing
         const blessing = document.createElement('p');
         blessing.className = 'bless-container scroll-container';
-        blessing.innerHTML = savedBlessing ? savedBlessing : guest.blessing;
+        blessing.innerHTML = guest.blessing;
         div.appendChild(blessing);
 
         //signature
@@ -52,4 +65,4 @@ function drawList(list) {
     });
 }
 
-drawList(guestList);
+drawList(guestsDocs);

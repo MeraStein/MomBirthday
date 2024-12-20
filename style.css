@@ -21,7 +21,7 @@ body{
     position: relative; 
     align-items: center;
     height: 100vh; 
-    width: 50vh;
+    width: 56vh;
     background-image: url('resources/images/open-pic.png'); 
     background-size: cover; 
     background-position: center;
@@ -64,6 +64,8 @@ ul{
     align-items: flex-start;
     padding-left: 0;
     margin-left: 8%;
+    margin-right: 3%;
+    margin-top: 6%;
 }
 
 li {
@@ -115,6 +117,7 @@ textarea:focus {
     color: whitesmoke;
     width: 22vh;
     height: 2.4vh;
+    margin-right: 2%;
 }
 
 .icon-finger {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html dir="rtl" lang="er">
+<html dir="rtl" lang="he">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +12,82 @@
         <input type="text" id="searchInput" placeholder="חפש פה..." />
         <ul id="guestList"></ul>
     </div>
-    <script type="module" src="script.js"></script>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { addDataWithCustomId } from './firebase.js';
+
+        class Guest {
+            constructor(name, question, answer, options, pictureSrc = []) {
+                this.name = name;
+                this.question = question;
+                this.answer = answer;
+                this.options = options;
+                this.pictureSrc = pictureSrc || 'resources/images/default-pic.jpg';
+                this.isComing = false;
+                this.blessing = "";
+            }
+        }
+
+        const guestList = [];
+
+        async function fillGuestList() {
+            let name, question, answer, opts = [], picSrc;
+
+            try {
+                const response = await fetch('resources/data/guests-data.txt');
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+                const text = await response.text();
+
+                const lines = text.split('\n');
+                lines.forEach((line, index) => {
+                    line = line.trim(); 
+                    if(line === '') return; 
+
+                    switch (index % 7) {
+                        case 0: 
+                            name = line;
+                            break;
+                        case 1:
+                            question = line;
+                            break;
+                        case 2:
+                            answer = line;
+                            break;
+                        case 3:
+                        case 4:
+                        case 5:
+                            opts.push(line);
+                            break;
+                        case 6:
+                            picSrc = line.replace(/['"]/g, '');
+                            guestList.push(new Guest(name, question, answer, opts, picSrc));
+                            opts = [];
+                            break;
+                    }
+                });
+                console.log(guestList); 
+                guestList.sort((a, b) => a.name.localeCompare(b.name)); 
+            } catch (error) {
+                console.error('שגיאה בקריאת הקובץ:', error);
+            }
+        }
+
+        async function addGuestsToDb() {
+            for (const guest of guestList) {
+                await addDataWithCustomId(guest);
+            }
+        }
+
+        async function initialize() {
+            await fillGuestList();  
+            await addGuestsToDb();  
+        }
+
+        //initialize();  
+    </script>
+
+    <script type="module" src="script.js"></script>  
+
 </body>
 </html>
